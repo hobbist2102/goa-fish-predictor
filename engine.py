@@ -1,28 +1,22 @@
-import datetime
-import math
 import json
-import os
+import math
+import datetime
 
-from cmems_sst import fetch_sst
-
-# Load species temperature preferences
+# Load species data from local JSON file
 with open("species.json", "r") as f:
-    species_data = json.load(f)
+    species_json = json.load(f)
+    species_data = {
+        s["common_name"].lower(): s for s in species_json.get("species", [])
+    }
 
-# --------------------------
-# Utility Functions
-# --------------------------
-
+# Utility functions
 def sigmoid(x):
     return 1 / (1 + math.exp(-x))
 
 def clamp(val, min_val=0.0, max_val=1.0):
     return max(min(val, max_val), min_val)
 
-# --------------------------
-# Scoring Components
-# --------------------------
-
+# Scoring functions
 def tide_score(hours_from_high):
     return sigmoid(-abs(hours_from_high) / 1.5)
 
@@ -51,13 +45,13 @@ def wind_boost_score(speed_mps, is_onshore):
         return 0.3
 
 def sst_score(current_sst, species_name):
-    try:
-        species = species_data[species_name]
-        T_opt = species["preferred_temperature"]
-        sigma = species.get("tolerance_sigma", 2)
-        return math.exp(-((current_sst - T_opt) ** 2) / (2 * sigma ** 2))
-    except KeyError:
+    species = species_data.get(species_name.lower())
+    if not species:
         return 0.5
+    T_opt = species.get("temperature_preference", {}).get("optimal", 27)
+    tolerance = species.get("temperature_preference", {}).get("tolerance", [24, 30])
+    sigma = (tolerance[1] - tolerance[0]) / 4 if len(tolerance) == 2 else 2
+    return math.exp(-((current_sst - T_opt) ** 2) / (2 * sigma ** 2))
 
 def seasonal_index(day_of_year, peak_day=288):
     return 0.5 + 0.5 * math.sin(2 * math.pi * (day_of_year - peak_day) / 365)
@@ -67,10 +61,7 @@ def method_bias(method, is_daytime):
         return 0.1
     return 0.0
 
-# --------------------------
-# Master Prediction Function
-# --------------------------
-
+# Main scoring engine
 def compute_fish_score(
     species_name,
     lat,
@@ -88,12 +79,9 @@ def compute_fish_score(
     wind_speed,
     is_onshore,
     method,
-    is_day
+    is_day,
+    sst
 ):
-    sst = fetch_sst(lat, lon, date)
-    if sst is None:
-        sst = 27.0
-
     score = (
         0.25 * tide_score(hrs_from_high) +
         0.10 * (daily_tide_range / max_range_30d) +
@@ -102,7 +90,7 @@ def compute_fish_score(
         0.10 * pressure_trend_score(pressure_now, pressure_6h_ago) +
         0.07 * wind_boost_score(wind_speed, is_onshore) +
         0.05 * sst_score(sst, species_name) +
-        0.03 * 1.0 +  # Turbidity placeholder
+        0.03 * 1.0 +  # Placeholder for turbidity
         0.07 * seasonal_index(date.timetuple().tm_yday) +
         0.03 * method_bias(method, is_day)
     )
@@ -117,28 +105,3 @@ def compute_fish_score(
         label = "Poor"
 
     return round(score, 3), label, round(sst, 2)
-
-# --------------------------
-# Simple wrapper for current use
-# --------------------------
-
-def calc_fai(state):
-    return compute_fish_score(
-        species_name="snapper",
-        lat=state["lat"],
-        lon=state["lon"],
-        date=datetime.date.today(),
-        hrs_from_high=0.5,
-        daily_tide_range=1.3,
-        max_range_30d=2.4,
-        solunar_type="major",
-        mins_to_solunar=20,
-        solar_alt=8,
-        cloud_frac=state["weather"].get("clouds", 20) / 100,
-        pressure_now=state["weather"].get("pressure", 1012),
-        pressure_6h_ago=state["weather"].get("pressure", 1010),
-        wind_speed=state["weather"].get("wind_speed", 2),
-        is_onshore=True,
-        method="lure",
-        is_day=True
-    )
