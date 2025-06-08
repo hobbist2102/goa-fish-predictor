@@ -6,10 +6,10 @@ import xarray as xr
 USERNAME = os.getenv("CMEMS_USER")
 PASSWORD = os.getenv("CMEMS_PASS")
 
-DATASET_ID = "SST_GLO_SST_L4_NRT_OBSERVATIONS_010_001"  # OSTIA global SST
-VARIABLES = ["analysed_sst"]
-LON_MIN, LON_MAX = 73.5, 75.5
-LAT_MIN, LAT_MAX = 14.5, 16.5
+DATASET_ID = "GLOBAL_ANALYSISFORECAST_PHY_001_024"
+VARIABLES = ["thetao"]
+LAT, LON = 15.5, 73.8  # Goa
+DELTA = 0.05
 
 date = datetime.now(timezone.utc) - timedelta(days=1)
 DATE_STR = date.strftime("%Y-%m-%d")
@@ -23,18 +23,19 @@ try:
         password=PASSWORD,
         dataset_id=DATASET_ID,
         variables=VARIABLES,
-        minimum_longitude=LON_MIN,
-        maximum_longitude=LON_MAX,
-        minimum_latitude=LAT_MIN,
-        maximum_latitude=LAT_MAX,
+        minimum_longitude=LON - DELTA,
+        maximum_longitude=LON + DELTA,
+        minimum_latitude=LAT - DELTA,
+        maximum_latitude=LAT + DELTA,
         start_datetime=DATE_STR,
         end_datetime=DATE_STR,
         output_filename=OUT_FILE,
         overwrite=True,
     )
     ds = xr.open_dataset(OUT_FILE)
-    print(ds)
+    sst_value = float(ds["thetao"].isel(depth=0).mean().item())
     ds.close()
-    print(f"✅ SST file saved: {OUT_FILE}")
+    print(f"✅ SST processed: {sst_value:.2f} °C")
+    # keep file for app use
 except Exception as e:
-    print(f"❌ CMEMS error: {e}")
+    print(f"❌ CMEMS SST fetch error: {e}")
