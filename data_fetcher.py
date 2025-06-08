@@ -1,44 +1,62 @@
+import os
 import datetime
 import requests
 from cmems_sst import fetch_sst
 
-# OpenWeather
-import os
+# Constants
+LAT, LON = 15.5, 73.8  # Default location: Goa coast
+WEATHER_KEY = os.getenv("openweathermap_key")
 
-OPENWEATHER_API_KEY = os.getenv("openweathermap_key")
-
-def get_weather(lat=15.5, lon=73.8):
+# ------------------------------------------------------------------
+# Weather from OpenWeatherMap
+# ------------------------------------------------------------------
+def _fetch_weather(lat: float, lon: float):
     url = (
-        f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={OPENWEATHER_API_KEY}&units=metric"
+        f"https://api.openweathermap.org/data/2.5/weather"
+        f"?lat={lat}&lon={lon}&appid={WEATHER_KEY}&units=metric"
     )
-    response = requests.get(url)
-    data = response.json()
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        weather = {
+            "temp": data["main"]["temp"],
+            "wind": data["wind"]["speed"],
+            "pressure": data["main"]["pressure"],
+            "visibility": data.get("visibility", 10000) / 1000,  # convert to km
+            "description": data["weather"][0]["description"].capitalize(),
+        }
+        return weather
+    except Exception as e:
+        print("⚠️ Error fetching weather:", e)
+        return {}
 
-    weather = {
-        "temperature": data["main"]["temp"],
-        "pressure": data["main"]["pressure"],
-        "wind_speed": data["wind"]["speed"],
-        "wind_dir": data["wind"]["deg"],
-        "visibility": data.get("visibility", 10000),  # fallback
-        "weather_main": data["weather"][0]["main"],
-    }
-
-    return weather
-
-def get_state_now(lat=15.5, lon=73.8):
+# ------------------------------------------------------------------
+# INCOIS Tides (Simulated placeholder)
+# ------------------------------------------------------------------
+def _fetch_tide_height():
+    # Placeholder value — replace with INCOIS API integration
+    import math
     now = datetime.datetime.utcnow()
-    today = now.date()
+    phase = (now.hour + now.minute / 60.0) / 24.0
+    height = 1.5 + 1.0 * math.sin(2 * math.pi * phase)
+    return round(height, 2)
 
-    # Weather
-    weather = get_weather(lat, lon)
+# ------------------------------------------------------------------
+# Aggregator
+# ------------------------------------------------------------------
+def get_state_now():
+    today = datetime.date.today() - datetime.timedelta(days=2)  # CMEMS delay buffer
 
-    # SST via CMEMS
-    sst = fetch_sst(lat, lon, today - datetime.timedelta(days=2))  # 2-day lag
+    weather = _fetch_weather(LAT, LON)
+    tide_height = _fetch_tide_height()
+    sst = fetch_sst(LAT, LON, today)
 
-    # Return unified state object
     return {
-        "datetime": now.isoformat(),
-        "location": {"lat": lat, "lon": lon},
+        "lat": LAT,
+        "lon": LON,
+        "date": today.isoformat(),
         "weather": weather,
+        "tide_height": tide_height,
         "sst": sst,
     }
