@@ -9,7 +9,7 @@ PASSWORD = os.getenv("CMEMS_PASS")
 
 # Configuration for the dataset
 DATASET_ID = "cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m"
-VARIABLE = "sohtc"  # Correct SST variable for this dataset
+VARIABLES = ["sohtc"]  # Use a list for 'variables'
 OUTPUT_DIR = "."
 LON_MIN, LON_MAX = 73.5, 75.5
 LAT_MIN, LAT_MAX = 14.5, 16.5
@@ -25,7 +25,7 @@ try:
         username=USERNAME,
         password=PASSWORD,
         dataset_id=DATASET_ID,
-        variable=VARIABLE,
+        variables=VARIABLES,  # ✅ FIXED HERE
         minimum_longitude=LON_MIN,
         maximum_longitude=LON_MAX,
         minimum_latitude=LAT_MIN,
