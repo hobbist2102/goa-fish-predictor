@@ -1,61 +1,71 @@
 import os
-import tempfile
-import xarray as xr
-from datetime import datetime
-import subprocess
+import requests
+import datetime
+from copernicus_marine_client import CopernicusMarineClient
 
-# Load credentials from Streamlit secrets (CMEMS)
+# Load credentials from environment (set via Streamlit secrets or OS env)
 CMEMS_USER = os.getenv("CMEMS_USER")
 CMEMS_PASS = os.getenv("CMEMS_PASS")
 
-# Define dataset URL and constraints
-PRODUCT = "SST_GLO_SST_L4_NRT_OBSERVATIONS_010_001"
-SERVICE_ID = "GLOBAL_ANALYSIS_FORECAST_PHY_001_024-TDS"
-DATASET_ID = "cmems_mod_glo_phy_anfc_0.083deg_P1D-m"
+# Client setup
+client = CopernicusMarineClient(
+    username=CMEMS_USER,
+    password=CMEMS_PASS,
+)
+
+# Dataset ID: Global Ocean Gridded L4 Sea Surface Temperature
+# You can change this if you want a different resolution/product
+DATASET_ID = "cmems_mod_glo_sst_l4_my_010_012"
 VARIABLE = "analysed_sst"
 
-LAT_MIN, LAT_MAX = 15.0, 16.0
-LON_MIN, LON_MAX = 73.0, 74.0
-
-def fetch_sst():
-    """
-    Downloads SST NetCDF file for today over Goa and returns mean SST (°C).
-    """
-    now = datetime.utcnow()
-    date_str = now.strftime("%Y-%m-%d")
-
-    # Temporary file for SST
-    temp_file = tempfile.NamedTemporaryFile(suffix=".nc", delete=False).name
-
-    # Build motuclient command
-    cmd = [
-        "motuclient",
-        "--motu", "https://nrt.cmems-du.eu/motu-web/Motu",
-        "--service-id", SERVICE_ID,
-        "--product-id", PRODUCT,
-        "--username", CMEMS_USER,
-        "--password", CMEMS_PASS,
-        "--longitude-min", str(LON_MIN),
-        "--longitude-max", str(LON_MAX),
-        "--latitude-min", str(LAT_MIN),
-        "--latitude-max", str(LAT_MAX),
-        "--date-min", f"{date_str} 00:00:00",
-        "--date-max", f"{date_str} 23:59:59",
-        "--variable", VARIABLE,
-        "--out-dir", os.path.dirname(temp_file),
-        "--out-name", os.path.basename(temp_file)
-    ]
-
+# Define function to download SST for a lat/lon box on a given date
+def fetch_sst(lat: float, lon: float, date: datetime.date) -> float:
     try:
-        subprocess.run(cmd, check=True, capture_output=True)
-        ds = xr.open_dataset(temp_file)
-        sst_c = ds[VARIABLE].mean().item() - 273.15  # Convert from K to °C
-        return round(sst_c, 2)
+        # CMEMS requires bounding box, even if very small
+        delta = 0.05
+        bbox = {
+            "north": lat + delta,
+            "south": lat - delta,
+            "east": lon + delta,
+            "west": lon - delta,
+        }
+
+        # Format time window (daily snapshot)
+        date_str = date.strftime("%Y-%m-%dT12:00:00")
+
+        # Output path
+        out_path = f"sst_{lat}_{lon}_{date.strftime('%Y%m%d')}.nc"
+
+        # Download data
+        client.download(
+            dataset_id=DATASET_ID,
+            variables=[VARIABLE],
+            minimum_longitude=bbox["west"],
+            maximum_longitude=bbox["east"],
+            minimum_latitude=bbox["south"],
+            maximum_latitude=bbox["north"],
+            start_datetime=date_str,
+            end_datetime=date_str,
+            output_filename=out_path,
+        )
+
+        # Load and parse SST
+        import xarray as xr
+        ds = xr.open_dataset(out_path)
+        sst_array = ds[VARIABLE].values
+        sst_value = float(sst_array[0][0][0])  # extract single value
+        ds.close()
+        os.remove(out_path)
+        return sst_value
+
     except Exception as e:
-        print("⚠️ CMEMS SST fetch failed:", e)
+        print(f"Error fetching SST: {e}")
         return None
-    finally:
-        try:
-            os.remove(temp_file)
-        except:
-            pass
+
+# Example call (if running as a script)
+if __name__ == "__main__":
+    lat, lon = 15.5, 73.8  # Goa coast
+    today = datetime.date.today() - datetime.timedelta(days=2)  # CMEMS has a 1–2 day lag
+    print("Fetching SST for:", today)
+    sst = fetch_sst(lat, lon, today)
+    print("SST:", sst, "°C")
