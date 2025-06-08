@@ -1,31 +1,47 @@
-name: Daily CMEMS SST Update
+name: Run SST fetch
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # Runs daily at 07:30 IST
+    - cron: "0 4 * * *"  # Runs daily at 9:30 AM IST (4:00 AM UTC)
   workflow_dispatch:
 
 jobs:
-  update-sst:
+  fetch-sst:
     runs-on: ubuntu-latest
 
+    env:
+      CMEMS_USER: ${{ secrets.CMEMS_USER }}
+      CMEMS_PASS: ${{ secrets.CMEMS_PASS }}
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Install CMEMS deps
-        run: pip install copernicusmarine xarray
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-      - name: Run SST fetch
-        env:
-          CMEMS_USER: ${{ secrets.CMEMS_USER }}
-          CMEMS_PASS: ${{ secrets.CMEMS_PASS }}
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Configure CMEMS credentials
+        run: |
+          mkdir -p ~/.config/copernicusmarine
+          echo "machine copernicusmarine.auth.ecmwf.int login $CMEMS_USER password $CMEMS_PASS" > ~/.netrc
+          chmod 600 ~/.netrc
+
+      - name: Run SST fetch script
         run: python cmems_sst.py || echo "SST fetch failed"
 
-      - name: Commit new SST files (if any)
+      - name: Commit SST data if available
         run: |
           git config user.name 'GitHub Actions'
-          git config user.email 'action@github.com'
-          git add sst_*.nc || echo "No files found"
-          git commit -m "🌊 Auto update SST data" || echo "Nothing to commit"
-          git push || echo "Push skipped"
+          git config user.email 'actions@github.com'
+          if ls sst_*.nc 1> /dev/null 2>&1; then
+            git add sst_*.nc
+            git commit -m "⬇️ Daily SST data update: $(date -u +'%Y-%m-%d')" || echo "Nothing to commit"
+            git push
+          else
+            echo "No SST data file found to commit."
