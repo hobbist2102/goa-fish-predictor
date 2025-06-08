@@ -1,37 +1,33 @@
 from copernicusmarine import open_dataset
-import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+import xarray as xr
 
-# Credentials from GitHub Secrets (set in workflow)
-CMEMS_USER = os.getenv("CMEMS_USER")
-CMEMS_PASS = os.getenv("CMEMS_PASS")
+# Calculate date (2 days lag is typical for CMEMS NRT)
+date = datetime.now(timezone.utc) - timedelta(days=2)
+date_str = date.strftime("%Y-%m-%d")
 
-# Use a 2-day lag for freshest available data
-date = datetime.utcnow() - timedelta(days=2)
-date_str = date.strftime('%Y-%m-%d')
-
-# Dataset ID — confirmed from CMEMS catalogue
+# Define dataset ID and variable name
 dataset_id = "SST_GLO_SST_L4_NRT_OBSERVATIONS_010_001"
-
-# Goa bounding box
-bbox = [73.5, 14.8, 74.5, 15.8]  # [west, south, east, north]
-
-# Output filename
-output_file = f"sst_{date_str}.nc"
 
 try:
     print("Fetching SST from CMEMS...")
 
-    ds = (
-        open_dataset(dataset_id, credentials=(CMEMS_USER, CMEMS_PASS))
-        .filter(time=date_str)
-        .filter(variables=["analysed_sst"])
-        .filter(bbox=bbox)
-        .to_xarray()
+    # Open the dataset
+    ds = open_dataset(
+        dataset_id,
+        minimum_longitude=72.5,
+        maximum_longitude=74.5,
+        minimum_latitude=14.5,
+        maximum_latitude=16.5,
+        start_datetime=date_str,
+        end_datetime=date_str,
+        variables=["analysed_sst"]
     )
 
-    ds.to_netcdf(output_file)
-    print(f"✅ SST data saved to {output_file}")
+    # Inspect the output
+    print(ds)
+    ds.to_netcdf("sst_{}.nc".format(date_str))
+    print("✅ SST data saved successfully.")
 
 except Exception as e:
     print(f"❌ CMEMS SST fetch error: {e}")
