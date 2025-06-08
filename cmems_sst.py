@@ -1,57 +1,46 @@
-import copernicusmarine
-import xarray as xr
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from copernicusmarine import subset
+import xarray as xr
 
-CMEMS_USER = os.getenv("CMEMS_USER")
-CMEMS_PASS = os.getenv("CMEMS_PASS")
+# Set your CMEMS credentials from environment variables
+USERNAME = os.getenv("CMEMS_USER")
+PASSWORD = os.getenv("CMEMS_PASS")
 
-# ✅ Working dataset for ocean temperature (thetao = SST at depth=0)
+# Configuration for the dataset
 DATASET_ID = "cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m"
-VARIABLE = "thetao"
-LAT, LON = 15.5, 73.8
-DELTA = 0.05
+VARIABLE = "sohtc"  # Correct SST variable for this dataset
+OUTPUT_DIR = "."
+LON_MIN, LON_MAX = 73.5, 75.5
+LAT_MIN, LAT_MAX = 14.5, 16.5
 
-def fetch_sst(date: datetime):
-    try:
-        print("Fetching SST from CMEMS...")
+# Use a timezone-aware date and subtract lag
+date = datetime.now(timezone.utc) - timedelta(days=2)  # CMEMS data is typically available with 1–2 day lag
+DATE = date.strftime("%Y-%m-%d")
 
-        bbox = {
-            "north": LAT + DELTA,
-            "south": LAT - DELTA,
-            "east": LON + DELTA,
-            "west": LON - DELTA,
-        }
+print("Fetching SST from CMEMS...")
 
-        output_file = "sst_result.nc"
+try:
+    subset_result = subset(
+        username=USERNAME,
+        password=PASSWORD,
+        dataset_id=DATASET_ID,
+        variable=VARIABLE,
+        minimum_longitude=LON_MIN,
+        maximum_longitude=LON_MAX,
+        minimum_latitude=LAT_MIN,
+        maximum_latitude=LAT_MAX,
+        start_datetime=DATE,
+        end_datetime=DATE,
+        output_filename=f"{OUTPUT_DIR}/sst_{DATE}.nc",
+    )
 
-        copernicusmarine.subset(
-            dataset_id=DATASET_ID,
-            variables=[VARIABLE],
-            minimum_longitude=bbox["west"],
-            maximum_longitude=bbox["east"],
-            minimum_latitude=bbox["south"],
-            maximum_latitude=bbox["north"],
-            start_datetime=date,
-            end_datetime=date,
-            output_filename=output_file,
-            overwrite=True,
-            username=CMEMS_USER,
-            password=CMEMS_PASS
-        )
+    print(f"✅ SST data downloaded: sst_{DATE}.nc")
 
-        ds = xr.open_dataset(output_file)
-        sst_value = ds[VARIABLE].isel(depth=0).mean().item()
-        ds.close()
-        os.remove(output_file)
+    # Optional: validate using xarray
+    ds = xr.open_dataset(f"{OUTPUT_DIR}/sst_{DATE}.nc")
+    print(ds)
 
-        print(f"✅ SST: {sst_value:.2f} °C")
-        return sst_value
-
-    except Exception as e:
-        print(f"⚠️ CMEMS SST fetch error: {e}")
-        return None
-
-if __name__ == "__main__":
-    date = datetime.utcnow() - timedelta(days=2)  # CMEMS data lag
-    fetch_sst(date)
+except Exception as e:
+    print(f"⚠️ CMEMS SST fetch error: {e}")
+    print("SST: None")
