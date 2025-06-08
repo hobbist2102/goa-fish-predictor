@@ -1,48 +1,49 @@
-import os
-import datetime
-import xarray as xr
-from copernicusmarine import subset
+name: Run SST fetch
 
-# Credentials come from ~/.netrc written in GitHub Actions
-# Dataset details
-DATASET_ID = "SST_GLO_SST_L4_REP_OBSERVATIONS_010_011"
-VARIABLES = ["analysed_sst"]
-LAT = 15.5
-LON = 73.8
-DELTA = 0.05
-DATE = datetime.datetime.utcnow() - datetime.timedelta(days=2)
+on:
+  schedule:
+    - cron: "0 4 * * *"  # Daily at 9:30 AM IST
+  workflow_dispatch:
 
-# Bounding box
-BBOX = {
-    "north": LAT + DELTA,
-    "south": LAT - DELTA,
-    "east": LON + DELTA,
-    "west": LON - DELTA,
-}
-OUTPUT_FILENAME = f"sst_{LAT}_{LON}_{DATE.strftime('%Y%m%d')}.nc"
+jobs:
+  fetch-sst:
+    runs-on: ubuntu-latest
 
-print("Fetching SST from CMEMS...")
+    env:
+      CMEMS_USER: ${{ secrets.CMEMS_USER }}
+      CMEMS_PASS: ${{ secrets.CMEMS_PASS }}
 
-try:
-    subset(
-        dataset_id=DATASET_ID,
-        variables=VARIABLES,
-        bounding_box={
-            "north": BBOX["north"],
-            "south": BBOX["south"],
-            "east": BBOX["east"],
-            "west": BBOX["west"],
-        },
-        date=DATE,
-        output_filename=OUTPUT_FILENAME,
-        overwrite=True,
-    )
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    ds = xr.open_dataset(OUTPUT_FILENAME)
-    value = float(ds[VARIABLES[0]].isel(time=0).mean().values)
-    print(f"SST for {DATE.date()}: {value:.2f} °C")
-    ds.close()
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-except Exception as e:
-    print(f"❌ CMEMS SST fetch error: {e}")
-    print("SST: None")
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Configure CMEMS credentials
+        run: |
+          mkdir -p ~/.config/copernicusmarine
+          echo "machine copernicusmarine.auth.ecmwf.int login $CMEMS_USER password $CMEMS_PASS" > ~/.netrc
+          chmod 600 ~/.netrc
+
+      - name: Run SST fetch script
+        run: |
+          echo "Fetching SST from CMEMS..."
+          python cmems_sst.py || echo "SST fetch failed"
+
+      - name: Commit SST data if available
+        run: |
+          git config user.name 'GitHub Actions'
+          git config user.email 'actions@github.com'
+          if ls sst_*.nc 1> /dev/null 2>&1; then
+            git add sst_*.nc
+            git commit -m "⬇️ Daily SST data update: $(date -u +'%Y-%m-%d')" || echo "Nothing to commit"
+            git push
+          else
+            echo "No SST data file found to commit."
