@@ -1,71 +1,51 @@
 import os
-import requests
 import datetime
-from copernicus_marine_client import CopernicusMarineClient
+import xarray as xr
+import copernicusmarine
 
-# Load credentials from environment (set via Streamlit secrets or OS env)
+# Credentials from Streamlit secrets or OS environment
 CMEMS_USER = os.getenv("CMEMS_USER")
 CMEMS_PASS = os.getenv("CMEMS_PASS")
 
-# Client setup
-client = CopernicusMarineClient(
-    username=CMEMS_USER,
-    password=CMEMS_PASS,
-)
+# Configure credentials
+copernicusmarine.set_credentials(username=CMEMS_USER, password=CMEMS_PASS)
 
-# Dataset ID: Global Ocean Gridded L4 Sea Surface Temperature
-# You can change this if you want a different resolution/product
-DATASET_ID = "cmems_mod_glo_sst_l4_my_010_012"
-VARIABLE = "analysed_sst"
+# Dataset and variable configuration
+DATASET_ID = "cmems_mod_glo_phy_my_0.25_P1D-m"  # Global Physical Ocean
+VARIABLES = ["thetao"]  # Sea Temperature
+DELTA = 0.05  # Latitude/Longitude bounding box delta
 
-# Define function to download SST for a lat/lon box on a given date
 def fetch_sst(lat: float, lon: float, date: datetime.date) -> float:
     try:
-        # CMEMS requires bounding box, even if very small
-        delta = 0.05
-        bbox = {
-            "north": lat + delta,
-            "south": lat - delta,
-            "east": lon + delta,
-            "west": lon - delta,
-        }
+        bbox = (lon - DELTA, lon + DELTA), (lat - DELTA, lat + DELTA)
+        output_path = f"sst_{lat}_{lon}_{date.strftime('%Y%m%d')}_subset.nc"
 
-        # Format time window (daily snapshot)
-        date_str = date.strftime("%Y-%m-%dT12:00:00")
-
-        # Output path
-        out_path = f"sst_{lat}_{lon}_{date.strftime('%Y%m%d')}.nc"
-
-        # Download data
-        client.download(
+        # Download subset
+        copernicusmarine.subset(
             dataset_id=DATASET_ID,
-            variables=[VARIABLE],
-            minimum_longitude=bbox["west"],
-            maximum_longitude=bbox["east"],
-            minimum_latitude=bbox["south"],
-            maximum_latitude=bbox["north"],
-            start_datetime=date_str,
-            end_datetime=date_str,
-            output_filename=out_path,
+            variables=VARIABLES,
+            longitude=bbox[0],
+            latitude=bbox[1],
+            date=date,
+            output_filename=output_path,
+            overwrite=True,
         )
 
-        # Load and parse SST
-        import xarray as xr
-        ds = xr.open_dataset(out_path)
-        sst_array = ds[VARIABLE].values
-        sst_value = float(sst_array[0][0][0])  # extract single value
+        # Extract SST
+        ds = xr.open_dataset(output_path)
+        sst_array = ds[VARIABLES[0]].values
+        sst_value = float(sst_array[0][0][0])  # 3D data
         ds.close()
-        os.remove(out_path)
+        os.remove(output_path)
         return sst_value
 
     except Exception as e:
-        print(f"Error fetching SST: {e}")
+        print(f"⚠️ Error fetching SST: {e}")
         return None
 
-# Example call (if running as a script)
+# Standalone test
 if __name__ == "__main__":
+    today = datetime.date.today() - datetime.timedelta(days=2)
     lat, lon = 15.5, 73.8  # Goa coast
-    today = datetime.date.today() - datetime.timedelta(days=2)  # CMEMS has a 1–2 day lag
-    print("Fetching SST for:", today)
-    sst = fetch_sst(lat, lon, today)
-    print("SST:", sst, "°C")
+    print("Fetching SST...")
+    print("Result:", fetch_sst(lat, lon, today), "°C")
