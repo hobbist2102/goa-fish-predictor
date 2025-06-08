@@ -1,33 +1,37 @@
-import copernicusmarine
+from copernicusmarine import open_dataset
 import os
 from datetime import datetime, timedelta
 
-# Set date to 2 days ago (data lag)
+# Credentials from GitHub Secrets (set in workflow)
+CMEMS_USER = os.getenv("CMEMS_USER")
+CMEMS_PASS = os.getenv("CMEMS_PASS")
+
+# Use a 2-day lag for freshest available data
 date = datetime.utcnow() - timedelta(days=2)
 date_str = date.strftime('%Y-%m-%d')
 
-# Dataset info for global SST
+# Dataset ID — confirmed from CMEMS catalogue
 dataset_id = "SST_GLO_SST_L4_NRT_OBSERVATIONS_010_001"
-variables = ["analysed_sst"]
 
 # Goa bounding box
-bbox = [73.5, 14.8, 74.5, 15.8]  # [lon_min, lat_min, lon_max, lat_max]
+bbox = [73.5, 14.8, 74.5, 15.8]  # [west, south, east, north]
 
-# Output path
+# Output filename
 output_file = f"sst_{date_str}.nc"
 
 try:
     print("Fetching SST from CMEMS...")
 
-    copernicusmarine.subset(
-        dataset_id=dataset_id,
-        variables=variables,
-        bounding_box=bbox,
-        date=date_str,
-        output_filename=output_file,
-        overwrite=True
+    ds = (
+        open_dataset(dataset_id, credentials=(CMEMS_USER, CMEMS_PASS))
+        .filter(time=date_str)
+        .filter(variables=["analysed_sst"])
+        .filter(bbox=bbox)
+        .to_xarray()
     )
 
-    print(f"✅ SST saved to {output_file}")
+    ds.to_netcdf(output_file)
+    print(f"✅ SST data saved to {output_file}")
+
 except Exception as e:
     print(f"❌ CMEMS SST fetch error: {e}")
