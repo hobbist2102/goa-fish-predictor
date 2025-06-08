@@ -1,0 +1,31 @@
+name: Daily CMEMS SST Update
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Runs daily at 07:30 IST
+  workflow_dispatch:
+
+jobs:
+  update-sst:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install CMEMS deps
+        run: pip install copernicusmarine xarray
+
+      - name: Run SST fetch
+        env:
+          CMEMS_USER: ${{ secrets.CMEMS_USER }}
+          CMEMS_PASS: ${{ secrets.CMEMS_PASS }}
+        run: python cmems_sst.py || echo "SST fetch failed"
+
+      - name: Commit new SST files (if any)
+        run: |
+          git config user.name 'GitHub Actions'
+          git config user.email 'action@github.com'
+          git add sst_*.nc || echo "No files found"
+          git commit -m "🌊 Auto update SST data" || echo "Nothing to commit"
+          git push || echo "Push skipped"
