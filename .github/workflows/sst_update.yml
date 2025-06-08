@@ -35,12 +35,13 @@ jobs:
       - name: Run SST fetch script
         run: python cmems_sst.py || echo "SST fetch failed"
 
-      - name: Commit SST data if available
+            - name: Commit SST data if available
         run: |
           git config user.name 'GitHub Actions'
           git config user.email 'actions@github.com'
-          if ls sst_*.nc 1> /dev/null 2>&1; then
-            git add sst_*.nc
+          FILES=$(ls sst_*.nc 2>/dev/null || true)
+          if [ -n "$FILES" ]; then
+            git add $FILES
             git commit -m "⬇️ Daily SST data update: $(date -u +'%Y-%m-%d')" || echo "Nothing to commit"
             git push
           else
