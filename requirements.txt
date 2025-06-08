@@ -9,4 +9,8 @@ tqdm==4.66.4
 scipy==1.13.1
 geopy==2.4.1
 beautifulsoup4==4.12.3
-lxml==5.2.1
+
+# NEW for CMEMS SST
+motuclient==1.8.18
+xarray==2024.3.0
+netCDF4==1.6.5
