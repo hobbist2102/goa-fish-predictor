@@ -1,40 +1,55 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import streamlit as st
 
-from data_fetcher import get_state_now
+from data_fetcher import get_state
 from engine import calc_fai
 from tactics import get_tactic_kit
 
 # ----------------------------------------------------------------------
-# Page setup
+# Page Setup
 # ----------------------------------------------------------------------
 
 st.set_page_config(
     page_title="Goa Fish Predictor",
     page_icon="🎣",
     layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
-st.title("🎣 Goa Fish Predictor – Live Tactical MVP")
+st.title("🎣 Goa Fish Predictor – Tactical AI")
 
 st.markdown(
-    "Physics‑first coastal fishing predictor for **Goa (15.5 °N, 73.8 °E)**.\n\n"
-    "Powered by live weather + moon phase and species-specific logic – *no catch logs required.*"
+    "Physics‑first coastal fishing predictor for **Goa (15.5 °N, 73.8 °E)**\n\n"
+    "*Uses live environmental data, lunar logic, and seasonal fish behavior — no catch logs needed.*"
 )
 
 # ----------------------------------------------------------------------
-# Core logic – Fetch environment
+# Time Input – User can ask for future prediction
 # ----------------------------------------------------------------------
 
-state = get_state_now()
+with st.expander("🎯 When are you planning to fish?"):
+    user_time = st.slider(
+        "Pick your target fishing time (forecast range: now to 72 hours ahead)",
+        min_value=datetime.now(),
+        max_value=datetime.now() + timedelta(days=3),
+        value=datetime.now() + timedelta(hours=1),
+        format="DD MMM HH:mm"
+    )
+
+# ----------------------------------------------------------------------
+# Get Environment for the Requested Time
+# ----------------------------------------------------------------------
+
+state = get_state(user_time)
 fai = calc_fai(state)
 tactics = get_tactic_kit(state)
 
 # ----------------------------------------------------------------------
-# Verdict
+# Display FAI + Verdict
 # ----------------------------------------------------------------------
 
-st.metric("🎯 Fish Activity Index", f"{fai:.2f}")
+st.subheader(f"🌐 Environmental Snapshot for {user_time.strftime('%a, %d %b %I:%M %p')}")
+st.metric("🧪 Fish Activity Index", f"{fai:.2f}")
 
 if fai < 0.40:
     verdict = "🔴 **Poor** — Better spend the time tying new rigs."
@@ -48,22 +63,22 @@ else:
 st.markdown(verdict)
 
 # ----------------------------------------------------------------------
-# Tactical Recommendations
+# Tactical Game Plan
 # ----------------------------------------------------------------------
 
 st.markdown("---")
-st.header("🧠 Tactical Game Plan (Top 3 species)")
+st.header("🎣 Tactical Game Plan – Top 3 Species to Target")
 
 for species in tactics:
-    st.subheader(f"🎣 {species['name']} — {species['score'] * 100:.0f}% Match")
+    st.subheader(f"{species['name']} — {species['score'] * 100:.0f}% Match")
     st.markdown(f"""
     - **Natural Baits**: {species['natural_baits']}
-    - **Artificial Lures**: {species['lures']} ({species['colour']} colour)
+    - **Artificial Lures**: {species['lures']} (**{species['colour']}** colour)
     - **Retrieve Style**: {species['retrieve_style']}
     - **Water Column**: {species['water_column']}
     - **Recommended Rigs**: {species['rigs']}
     """)
-    st.caption(f"📌 _Why this fish now:_ {species['rationale']}")
+    st.caption(f"🧠 _Why this species now:_ {species['rationale']}")
 
 # ----------------------------------------------------------------------
 # Footer
@@ -71,5 +86,5 @@ for species in tactics:
 
 st.markdown("---")
 st.caption(
-    "_Weather via Open‑Meteo | Moon phase integrated | SST + INCOIS tides coming soon._"
+    "_Weather via Open‑Meteo | Lunar phase calculated | SST (CMEMS) and real INCOIS tides coming soon._"
 )
