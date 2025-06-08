@@ -11,6 +11,7 @@ def fetch_sst(lat=15.5, lon=73.8, date=None):
     if not date:
         date = datetime.date.today() - datetime.timedelta(days=2)
 
+    # Bounding box
     lon_min, lon_max = lon - DELTA, lon + DELTA
     lat_min, lat_max = lat - DELTA, lat + DELTA
     out_file = f"sst_{lat}_{lon}_{date.strftime('%Y%m%d')}.nc"
@@ -23,7 +24,8 @@ def fetch_sst(lat=15.5, lon=73.8, date=None):
             maximum_longitude=lon_max,
             minimum_latitude=lat_min,
             maximum_latitude=lat_max,
-            date=date,
+            start_datetime=date.isoformat(),
+            end_datetime=date.isoformat(),
             output_filename=out_file,
             overwrite=True,
             username=os.getenv("CMEMS_USER"),
@@ -39,7 +41,6 @@ def fetch_sst(lat=15.5, lon=73.8, date=None):
         print("⚠️ CMEMS SST fetch error:", e)
         return None
 
-# Optional test
 if __name__ == "__main__":
-    sst = fetch_sst()
-    print("SST value:", sst)
+    print("Fetching SST from CMEMS...")
+    print("SST:", fetch_sst())
