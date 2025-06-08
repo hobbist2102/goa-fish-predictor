@@ -3,18 +3,14 @@ import xarray as xr
 import os
 from datetime import datetime, timedelta
 
-# Load credentials from GitHub Actions environment (set via GitHub Secrets)
 CMEMS_USER = os.getenv("CMEMS_USER")
 CMEMS_PASS = os.getenv("CMEMS_PASS")
 
-copernicusmarine.set_credentials(username=CMEMS_USER, password=CMEMS_PASS)
-
-# New valid CMEMS cloud-native dataset ID
+# ✅ Working dataset for ocean temperature (thetao = SST at depth=0)
 DATASET_ID = "cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m"
-VARIABLE = "thetao"  # temperature
-
-LAT, LON = 15.5, 73.8  # Goa
-DELTA = 0.05  # bounding box margin
+VARIABLE = "thetao"
+LAT, LON = 15.5, 73.8
+DELTA = 0.05
 
 def fetch_sst(date: datetime):
     try:
@@ -27,8 +23,9 @@ def fetch_sst(date: datetime):
             "west": LON - DELTA,
         }
 
-        # Cloud-native API call with correct variable and dimensions
-        result = copernicusmarine.subset(
+        output_file = "sst_result.nc"
+
+        copernicusmarine.subset(
             dataset_id=DATASET_ID,
             variables=[VARIABLE],
             minimum_longitude=bbox["west"],
@@ -37,22 +34,24 @@ def fetch_sst(date: datetime):
             maximum_latitude=bbox["north"],
             start_datetime=date,
             end_datetime=date,
-            output_filename="sst_result.nc",
-            overwrite=True
+            output_filename=output_file,
+            overwrite=True,
+            username=CMEMS_USER,
+            password=CMEMS_PASS
         )
 
-        ds = xr.open_dataset("sst_result.nc")
-        temp = ds[VARIABLE].isel(depth=0).mean().item()
+        ds = xr.open_dataset(output_file)
+        sst_value = ds[VARIABLE].isel(depth=0).mean().item()
         ds.close()
-        os.remove("sst_result.nc")
+        os.remove(output_file)
 
-        print(f"SST: {temp:.2f} °C")
-        return temp
+        print(f"✅ SST: {sst_value:.2f} °C")
+        return sst_value
 
     except Exception as e:
         print(f"⚠️ CMEMS SST fetch error: {e}")
         return None
 
 if __name__ == "__main__":
-    today = datetime.utcnow() - timedelta(days=2)  # safest delay
-    fetch_sst(today)
+    date = datetime.utcnow() - timedelta(days=2)  # CMEMS data lag
+    fetch_sst(date)
