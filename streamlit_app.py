@@ -24,7 +24,7 @@ st.title("🎣 Goa Fish Predictor – Goa-wide Live MVP")
 st.markdown(
     "**Physics-first coastal fishing predictor** for the Goa coastline.\n\n"
     "Uses **real-time data** from OpenWeatherMap, CMEMS SST, and INCOIS tides — "
-    "**no catch logs required**.\n"
+    "**no catch logs required**."
 )
 
 # ----------------------------------------------------------------------
@@ -72,5 +72,5 @@ st.markdown(plan)
 # ----------------------------------------------------------------------
 
 st.caption(
-    "_Live weather: Open‑Meteo | Tides: INCOIS | SST: CMEMS (auth required)_"
+    "_Live weather: OpenWeatherMap | Tides: INCOIS | SST: CMEMS (auth required)_"
 )
