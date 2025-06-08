@@ -1,33 +1,46 @@
-from copernicusmarine import open_dataset
+import os
 from datetime import datetime, timedelta, timezone
-import xarray as xr
+import logging
+from copernicusmarine import open_dataset, set_credentials
 
-# Calculate date (2 days lag is typical for CMEMS NRT)
-date = datetime.now(timezone.utc) - timedelta(days=2)
-date_str = date.strftime("%Y-%m-%d")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
-# Define dataset ID and variable name
-dataset_id = "SST_GLO_SST_L4_NRT_OBSERVATIONS_010_001"
+# === 1. CMEMS Credentials ===
+CMEMS_USER = os.getenv("CMEMS_USER")
+CMEMS_PASS = os.getenv("CMEMS_PASS")
+
+if not CMEMS_USER or not CMEMS_PASS:
+    raise ValueError("CMEMS_USER or CMEMS_PASS not found in environment variables.")
+
+set_credentials(username=CMEMS_USER, password=CMEMS_PASS)
+
+# === 2. Dataset Selection ===
+# Using Reprocessed SST for Global: https://data.marine.copernicus.eu/product/SST_GLO_SST_L4_REP_OBSERVATIONS_010_011
+DATASET_ID = "SST_GLO_SST_L4_REP_OBSERVATIONS_010_011"
+
+# === 3. Time Range ===
+date = datetime.now(timezone.utc) - timedelta(days=5)
+start_date = date.strftime("%Y-%m-%dT00:00:00")
+end_date = date.strftime("%Y-%m-%dT23:59:59")
+
+# === 4. Goa Region ===
+# (Lat, Lon) box around Goa: [South, North, West, East]
+BBOX = [14.8, 15.8, 73.6, 74.4]
+
+# === 5. Output File ===
+output_file = f"sst_{date.strftime('%Y%m%d')}.nc"
 
 try:
-    print("Fetching SST from CMEMS...")
-
-    # Open the dataset
+    logging.info("Fetching SST from CMEMS...")
     ds = open_dataset(
-        dataset_id,
-        minimum_longitude=72.5,
-        maximum_longitude=74.5,
-        minimum_latitude=14.5,
-        maximum_latitude=16.5,
-        start_datetime=date_str,
-        end_datetime=date_str,
-        variables=["analysed_sst"]
+        dataset_id=DATASET_ID,
+        start_datetime=start_date,
+        end_datetime=end_date,
+        bbox=BBOX,
+        variables=["analysed_sst"],
     )
-
-    # Inspect the output
-    print(ds)
-    ds.to_netcdf("sst_{}.nc".format(date_str))
-    print("✅ SST data saved successfully.")
-
+    ds.to_netcdf(output_file)
+    logging.info(f"SST data saved to: {output_file}")
 except Exception as e:
-    print(f"❌ CMEMS SST fetch error: {e}")
+    logging.error(f"❌ CMEMS SST fetch error: {e}")
