@@ -3,49 +3,39 @@ import datetime
 import xarray as xr
 import copernicusmarine
 
-# Credentials from Streamlit secrets or OS environment
-CMEMS_USER = os.getenv("CMEMS_USER")
-CMEMS_PASS = os.getenv("CMEMS_PASS")
+# Set credentials
+copernicusmarine.set_credentials(
+    username=os.getenv("CMEMS_USER"),
+    password=os.getenv("CMEMS_PASS")
+)
 
-# Configure credentials
-copernicusmarine.set_credentials(username=CMEMS_USER, password=CMEMS_PASS)
+DATASET_ID = "cmems_mod_glo_phy_my_0.25_P1D-m"
+VARIABLE = "thetao"
+DELTA = 0.05
 
-# Dataset and variable configuration
-DATASET_ID = "cmems_mod_glo_phy_my_0.25_P1D-m"  # Global Physical Ocean
-VARIABLES = ["thetao"]  # Sea Temperature
-DELTA = 0.05  # Latitude/Longitude bounding box delta
+def fetch_sst(lat=15.5, lon=73.8, date=None):
+    if not date:
+        date = datetime.date.today() - datetime.timedelta(days=2)
 
-def fetch_sst(lat: float, lon: float, date: datetime.date) -> float:
+    lon_min, lon_max = lon - DELTA, lon + DELTA
+    lat_min, lat_max = lat - DELTA, lat + DELTA
+    out = f"sst_{lat}_{lon}_{date.strftime('%Y%m%d')}.nc"
+
     try:
-        bbox = (lon - DELTA, lon + DELTA), (lat - DELTA, lat + DELTA)
-        output_path = f"sst_{lat}_{lon}_{date.strftime('%Y%m%d')}_subset.nc"
-
-        # Download subset
         copernicusmarine.subset(
             dataset_id=DATASET_ID,
-            variables=VARIABLES,
-            longitude=bbox[0],
-            latitude=bbox[1],
+            variables=[VARIABLE],
+            longitude=(lon_min, lon_max),
+            latitude=(lat_min, lat_max),
             date=date,
-            output_filename=output_path,
-            overwrite=True,
+            output_filename=out,
+            overwrite=True
         )
-
-        # Extract SST
-        ds = xr.open_dataset(output_path)
-        sst_array = ds[VARIABLES[0]].values
-        sst_value = float(sst_array[0][0][0])  # 3D data
+        ds = xr.open_dataset(out)
+        sst = float(ds[VARIABLE][0, 0, 0])
         ds.close()
-        os.remove(output_path)
-        return sst_value
-
+        os.remove(out)
+        return sst
     except Exception as e:
-        print(f"⚠️ Error fetching SST: {e}")
+        print("⬇️ CMEMS SST fetch error:", e)
         return None
-
-# Standalone test
-if __name__ == "__main__":
-    today = datetime.date.today() - datetime.timedelta(days=2)
-    lat, lon = 15.5, 73.8  # Goa coast
-    print("Fetching SST...")
-    print("Result:", fetch_sst(lat, lon, today), "°C")
