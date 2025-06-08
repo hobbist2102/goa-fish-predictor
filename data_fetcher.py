@@ -1,96 +1,69 @@
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
-import math
-import streamlit as st
+import os
 
-# -------------------- CONSTANTS --------------------
+from cmems_sst import fetch_sst
+from incois_tide import get_tide_height
 
-OPENWEATHER_URL = "https://api.openweathermap.org/data/2.5/forecast"
-API_KEY = st.secrets["openweathermap_key"]
-CMEMS_USER = st.secrets.get("CMEMS_USER")
-CMEMS_PASS = st.secrets.get("CMEMS_PASS")
-LAT = 15.5
-LON = 73.8
+# Load OWM API key
+OWM_KEY = os.getenv("openweathermap_key")
 
-# -------------------- MAIN ENTRY --------------------
+# Default coords (Goa center)
+DEFAULT_LAT = 15.5
+DEFAULT_LON = 73.8
 
-def get_state(target_time: datetime):
-    weather = _fetch_weather(LAT, LON, target_time)
-    tide_height = _fetch_incois_tide(target_time)
-    sst = _fetch_cmems_sst(target_time) or weather["temp_c"]
+def _fetch_weather(lat, lon):
+    url = (
+        f"https://api.openweathermap.org/data/2.5/onecall?lat={lat}&lon={lon}"
+        f"&exclude=minutely,daily,alerts&appid={OWM_KEY}&units=metric"
+    )
+
+    res = requests.get(url)
+    data = res.json()
+
+    now = datetime.utcnow()
+    hourly = data["hourly"]
+    idx_now = min(range(len(hourly)), key=lambda i: abs(hourly[i]["dt"] - now.timestamp()))
+    current = hourly[idx_now]
 
     return {
-        "lat": LAT,
-        "lon": LON,
-        "timestamp": target_time.isoformat(),
-        "temp_c": sst,
-        "wind_kph": weather["wind_kph"],
-        "pressure_hpa": weather["pressure_hpa"],
-        "visibility_km": weather["visibility_km"],
-        "cloud_pct": weather["cloud_pct"],
-        "moon_phase": _estimate_moon_phase(target_time),
+        "time": datetime.utcfromtimestamp(current["dt"]).astimezone(pytz.timezone("Asia/Kolkata")),
+        "temp": current["temp"],
+        "wind_speed": current["wind_speed"],
+        "wind_deg": current["wind_deg"],
+        "pressure": current["pressure"],
+        "clouds": current["clouds"],
+        "visibility": current.get("visibility", 10000)
+    }
+
+def _fetch_moon_phase():
+    # Moon phase is approximated using phase angle calc
+    day_of_cycle = (datetime.utcnow() - datetime(2001, 1, 1)).days % 29.53
+    if day_of_cycle < 1 or day_of_cycle > 28.5:
+        return "new"
+    elif 13.5 < day_of_cycle < 16.5:
+        return "full"
+    elif day_of_cycle < 13.5:
+        return "waxing"
+    else:
+        return "waning"
+
+def get_state_now(lat=DEFAULT_LAT, lon=DEFAULT_LON):
+    weather = _fetch_weather(lat, lon)
+    moon = _fetch_moon_phase()
+    tide_height = get_tide_height(weather["time"].time()) or 0.0
+    sst = fetch_sst() or 27.0
+
+    return {
+        "datetime": weather["time"],
+        "temp_c": weather["temp"],
+        "pressure_hPa": weather["pressure"],
+        "wind_kph": weather["wind_speed"] * 3.6,
+        "wind_deg": weather["wind_deg"],
+        "cloud_pct": weather["clouds"],
+        "visibility_m": weather["visibility"],
+        "moon_phase": moon,
         "tide_m": tide_height,
-        "hour": target_time.hour,
-        "month": target_time.month
+        "sst_c": sst
     }
-
-# -------------------- WEATHER --------------------
-
-def _fetch_weather(lat, lon, target_time):
-    response = requests.get(OPENWEATHER_URL, params={
-        "lat": lat,
-        "lon": lon,
-        "appid": API_KEY,
-        "units": "metric"
-    })
-    response.raise_for_status()
-
-    data = response.json()
-    hourly = data.get("list", [])
-    closest = min(hourly, key=lambda x: abs(datetime.strptime(x["dt_txt"], "%Y-%m-%d %H:%M:%S") - target_time))
-
-    return {
-        "temp_c": closest["main"]["temp"],
-        "wind_kph": closest["wind"]["speed"] * 3.6,
-        "pressure_hpa": closest["main"]["pressure"],
-        "visibility_km": closest.get("visibility", 10000) / 1000,
-        "cloud_pct": closest["clouds"]["all"]
-    }
-
-# -------------------- MOON PHASE --------------------
-
-def _estimate_moon_phase(dt):
-    year, month, day = dt.year, dt.month, dt.day
-    if month < 3:
-        year -= 1
-        month += 12
-    a = math.floor(year / 100)
-    b = 2 - a + math.floor(a / 4)
-    jd = math.floor(365.25 * (year + 4716)) + math.floor(30.6001 * (month + 1)) + day + b - 1524.5
-    days_since_new = jd - 2451549.5
-    new_moons = days_since_new / 29.53
-    return round((new_moons - int(new_moons)) * 100, 2)  # percent illumination proxy
-
-# -------------------- INCOIS TIDE (SCRAPED FALLBACK) --------------------
-
-def _fetch_incois_tide(target_time):
-    try:
-        url = "https://webapps.incois.gov.in/TideForecast/"
-        # In production, scrape page or download daily CSV if available (to be implemented)
-        return 1.2  # placeholder fallback
-    except:
-        return 1.0
-
-# -------------------- CMEMS SST --------------------
-
-def _fetch_cmems_sst(target_time):
-    if not CMEMS_USER or not CMEMS_PASS:
-        return None
-
-    try:
-        # Example placeholder — Replace with CMEMS API or motuclient logic
-        # This would normally request NetCDF data and extract SST for the lat/lon
-        return 27.5  # placeholder fallback
-    except:
-        return None
