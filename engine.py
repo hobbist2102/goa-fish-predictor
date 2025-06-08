@@ -1,82 +1,119 @@
+import json
 import math
+from pathlib import Path
 
-def calc_fai(state: dict) -> float:
+# ----------------------------------------------------
+# Load species intelligence
+# ----------------------------------------------------
+
+with open(Path(__file__).parent / "species.json", "r", encoding="utf-8") as f:
+    species_db = json.load(f)["species"]
+
+# ----------------------------------------------------
+# Compute Fish Activity Index (simple 0-1 scale)
+# ----------------------------------------------------
+
+def calc_fai(state):
     """
-    Compute Fish Activity Index (FAI) from live environmental state.
-    Returns a float between 0.0 (dead) and 1.0 (perfect).
+    High-level heuristic index for fishing conditions (0 = bad, 1 = excellent).
+    Factors: temp, pressure, cloud, tide, moon phase, SST
     """
+    temp = state["temp_c"]
+    pressure = state["pressure_hpa"]
+    cloud = state["cloud_pct"]
+    tide = state["tide_m"]
+    moon = state["moon_phase"]
 
-    # ----------------------
-    # Environmental variables
-    # ----------------------
-    wind_kph     = state["wind_kph"]
-    pressure     = state["pressure_hpa"]
-    moon         = state["moon_phase"]  # 0 = new moon, 1 = full moon
-    hour         = state["hour"]
-    month        = state["month"]
-    visibility   = state["visibility_km"]
-    cloud_pct    = state["cloud_pct"]
+    score = 0
 
-    # ----------------------
-    # Scoring logic
-    # ----------------------
+    # Ideal temperature range boost
+    score += 0.25 if 24 <= temp <= 29 else 0.10
 
-    # Wind (best: 5–15 kph)
-    if wind_kph < 3 or wind_kph > 25:
-        wind_score = 0.2
-    elif 5 <= wind_kph <= 15:
-        wind_score = 1.0
+    # Moderate cloud cover is good
+    score += 0.15 if 20 <= cloud <= 60 else 0.05
+
+    # Tide not too low or too high
+    score += 0.20 if 0.6 <= tide <= 2.2 else 0.05
+
+    # Moon phase (full/new) bonus
+    if moon < 10 or moon > 90:
+        score += 0.15
     else:
-        wind_score = 0.6
+        score += 0.05
 
-    # Pressure: most fish dislike sudden drops
-    if pressure > 1018:
-        pressure_score = 0.8
-    elif 1010 <= pressure <= 1018:
-        pressure_score = 1.0
-    elif 1005 <= pressure < 1010:
-        pressure_score = 0.6
-    else:
-        pressure_score = 0.3
+    # Pressure tolerance (minimal change assumed OK)
+    score += 0.15
 
-    # Moon: strongest bite on full and new moon
-    moon_score = 1.0 - abs(moon - 0.5) * 2  # Bell curve: 1.0 at 0 or 1, 0 at 0.5
+    return min(round(score, 2), 1.0)
 
-    # Time of day: peaks around sunrise/sunset (5–8AM and 4–7PM)
-    if 5 <= hour <= 8 or 16 <= hour <= 19:
-        time_score = 1.0
-    elif 9 <= hour <= 15:
-        time_score = 0.6
-    else:
-        time_score = 0.3
+# ----------------------------------------------------
+# Tactical Engine: Scores each species and returns top 3
+# ----------------------------------------------------
 
-    # Seasonality (simplified): higher score in monsoon-to-winter transition
-    if month in [9, 10, 11, 12, 1, 2]:
-        season_score = 1.0
-    elif month in [6, 7, 8]:
-        season_score = 0.6
-    else:
-        season_score = 0.3
+def get_tactic_kit(state):
+    temp = state["temp_c"]
+    pressure = state["pressure_hpa"]
+    moon = state["moon_phase"]
+    tide = state["tide_m"]
+    month = state["month"]
 
-    # Visibility proxy (from clouds + visibility distance)
-    if cloud_pct < 40 and visibility > 8:
-        clarity_score = 1.0
-    elif visibility > 5:
-        clarity_score = 0.7
-    else:
-        clarity_score = 0.4
+    scored_species = []
 
-    # ----------------------
-    # Weighted average model
-    # ----------------------
+    for fish in species_db:
+        s = 0
+        notes = []
 
-    fai = (
-        wind_score * 0.20 +
-        pressure_score * 0.20 +
-        moon_score * 0.15 +
-        time_score * 0.20 +
-        season_score * 0.15 +
-        clarity_score * 0.10
-    )
+        # Temperature range match
+        if fish["temperature_preference"]["tolerance"][0] <= temp <= fish["temperature_preference"]["tolerance"][1]:
+            s += 0.25
+            notes.append("✅ Optimal temperature match")
+        else:
+            notes.append("⚠️ Temperature outside best range")
 
-    return round(fai, 2)
+        # Month = peak or nearby
+        peak = fish["monthly_seasonality"]["peak_month"]
+        spread = fish["monthly_seasonality"]["spread_months"]
+        delta = min(abs(month - peak), 12 - abs(month - peak))
+        if delta <= spread // 2:
+            s += 0.20
+            notes.append("✅ In seasonal window")
+        else:
+            notes.append("❌ Off-season")
+
+        # Pressure assumed stable
+        s += 0.15
+        notes.append("✅ Stable barometric pressure")
+
+        # Moon phase (only if specified)
+        if "moon_phase" in fish.get("feeding_triggers", {}):
+            if moon < 10 or moon > 90:
+                s += 0.10
+                notes.append("🌑 Favorable moon phase")
+            else:
+                notes.append("🌕 Moon phase neutral")
+
+        # Tide match (general logic)
+        if 0.5 < tide < 2.5:
+            s += 0.10
+            notes.append("🌊 Acceptable tide height")
+        else:
+            notes.append("⚠️ Unusual tide height")
+
+        # Water column bonus
+        if "water_column" in fish:
+            s += 0.10
+
+        scored_species.append({
+            "name": fish["common_name"],
+            "score": round(s, 2),
+            "natural_baits": ", ".join(fish["bait"]["natural"]),
+            "lures": ", ".join(fish["bait"]["artificial"]),
+            "colour": fish["lure_color"]["clear"],  # can match to current water later
+            "retrieve_style": ", ".join(fish["retrieve_style"]),
+            "rigs": ", ".join(fish["rig_types"]),
+            "water_column": fish["water_column"],
+            "rationale": " | ".join(notes)
+        })
+
+    top_3 = sorted(scored_species, key=lambda x: x["score"], reverse=True)[:3]
+    return top_3
