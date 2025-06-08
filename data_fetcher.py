@@ -1,71 +1,109 @@
-"""Streamlit front‑end for the Goa Fish Predictor (location‑aware).
+"""data_fetcher.py – Live environmental snapshot builder for Goa Fish Predictor.
 
-Choose a fishing area within Goa; the app fetches live environmental data for
-that lat/lon and computes the Fish Activity Index.
+This is the **correct** version. The file should NOT import itself. If your
+GitHub `data_fetcher.py` currently starts with `from data_fetcher import ...`,
+replace its entire contents with this block.
+
+Sources (MVP)
+-------------
+• Weather / pressure / wind  → Open-Meteo  (no API key)
+• Sun / moon metrics         → Astral      (deterministic)
+• Tide derivative            → Synthetic 12.42 h sinusoid (placeholder)
+• SST / chlorophyll          → Constant placeholder (hook CMEMS later)
+
+Public helper
+-------------
+get_state_now(lat: float = 15.488, lon: float = 73.827) → engine.State
 """
 from __future__ import annotations
 
-import streamlit as st
+import math
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+import requests
+from astral import LocationInfo
+from astral.sun import sun
 
-from data_fetcher import get_state_now
-from engine import calc_fai
-
-# ---------------------------------------------------------------------
-# Pre‑defined fishing spots (expand anytime)
-# ---------------------------------------------------------------------
-
-SPOTS = {
-    "Central Goa (Miramar)": (15.488, 73.827),
-    "Zuari Estuary (Cortalim)": (15.385, 73.892),
-    "Chapora Mouth": (15.610, 73.737),
-    "Cabo de Rama": (15.149, 73.924),
-    "Colva Beach": (15.271, 73.922),
-}
+from engine import State
 
 # ---------------------------------------------------------------------
-# Page setup
+# Constants
 # ---------------------------------------------------------------------
-
-st.set_page_config(
-    page_title="Goa Fish Predictor",
-    page_icon="🐟",
-    layout="centered",
-)
-
-st.title("🎣 Goa Fish Predictor – Live MVP")
-st.markdown("Select a spot, get an instant activity score. No catch logs needed.")
+LOCAL_TZ = ZoneInfo("Asia/Kolkata")  # IST (UTC+5:30)
 
 # ---------------------------------------------------------------------
-# Spot selector
+# Helper functions
 # ---------------------------------------------------------------------
 
-spot_name = st.selectbox("Choose your fishing area:", list(SPOTS.keys()))
-lat, lon = SPOTS[spot_name]
+def _fetch_weather(lat: float, lon: float) -> dict:
+    """Return dict with temperature, 3‑h temp trend, wind, and 3‑h pressure trend."""
+    url = (
+        "https://api.open-meteo.com/v1/forecast"
+        f"?latitude={lat}&longitude={lon}"
+        "&current_weather=true&timezone=UTC"
+        "&hourly=temperature_2m,pressure_msl"
+    )
+    data = requests.get(url, timeout=10).json()
+    cw = data["current_weather"]
 
-st.caption(f"Coordinates: {lat:.3f}°, {lon:.3f}° (WGS84)")
+    # Find nearest hourly index; fallback to last record if exact time missing
+    try:
+        idx_now = data["hourly"]["time"].index(cw["time"])
+    except ValueError:
+        idx_now = -1
+
+    t_now  = data["hourly"]["temperature_2m"][idx_now]
+    t_prev = data["hourly"]["temperature_2m"][max(idx_now - 3, 0)]
+    dT_3h  = t_now - t_prev
+
+    p_now  = data["hourly"]["pressure_msl"][idx_now]
+    p_prev = data["hourly"]["pressure_msl"][max(idx_now - 3, 0)]
+    dP_3h  = p_now - p_prev
+
+    return {
+        "temp": t_now,
+        "dT_3h": dT_3h,
+        "wind_speed": cw["windspeed"],
+        "wind_dir": cw["winddirection"],
+        "dP_3h": dP_3h,
+    }
+
+
+def _compute_tide_derivative(now: datetime) -> float:
+    """Synthetic tide derivative – replace with INCOIS when ready."""
+    hours = now.hour + now.minute / 60
+    day_fraction = (now.timetuple().tm_yday % 14) / 14  # spring–neap cycle
+    amplitude = 1.5 * math.sin(day_fraction * math.pi)  # ~0–1.5 m
+    dh_dt = amplitude * math.cos(2 * math.pi * hours / 12.42)
+    return dh_dt
+
+
+def _sun_moon_metrics(lat: float, lon: float) -> tuple[float, float]:
+    """Return phase‑concordance index & moon‑transit delta (placeholders)."""
+    pci = 0.5  # neutral until real high‑tide data available
+    mtw = 0.0
+    return pci, mtw
 
 # ---------------------------------------------------------------------
-# Core calculation
+# Public API
 # ---------------------------------------------------------------------
 
-state = get_state_now(lat, lon)
-fai = calc_fai(state)
+def get_state_now(lat: float = 15.488, lon: float = 73.827) -> State:
+    """Return an engine.State populated with **live** weather for given coords."""
+    now = datetime.now(tz=LOCAL_TZ)
 
-# ---------------------------------------------------------------------
-# Display results
-# ---------------------------------------------------------------------
+    w = _fetch_weather(lat, lon)
+    pci, mtw = _sun_moon_metrics(lat, lon)
 
-st.metric("Fish Activity Index", f"{fai:.2f}")
-
-if fai < 0.40:
-    verdict = "🔴 **Poor** — Better spend the time tying new rigs."
-elif fai < 0.65:
-    verdict = "🟠 **Fair** — Try dawn or dusk only."
-elif fai < 0.80:
-    verdict = "🟡 **Good** — Decent chance of action!"
-else:
-    verdict = "🟢 **Great** — Grab your gear and go!"
-
-st.markdown(verdict)
-
-st.caption("Live weather from Open‑Meteo; tide derivative is synthetic until INCOIS is wired in. Spot list is editable in `SPOTS` dict.")
+    return State(
+        T=w["temp"],
+        dT_dt=w["dT_3h"],
+        dh_dt=_compute_tide_derivative(now),
+        pci=pci,
+        mtw=mtw,
+        dP_3h=w["dP_3h"],
+        wspd=w["wind_speed"],
+        onshore=90 < w["wind_dir"] < 270,
+        chl=0.3,          # placeholder until CMEMS wired
+        salinity_class=1,
+    )
