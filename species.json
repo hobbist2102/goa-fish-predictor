@@ -1,0 +1,265 @@
+{
+  "species": [
+    {
+      "common_name": "Barramundi",
+      "scientific_name": "Lates calcarifer",
+      "preferred_habitat": ["estuaries", "river mouth", "coastal reef"],
+      "feeding_triggers": {
+        "temperature": "increasing (active >20\u00b0C) [oai_citation:27‡fish.wa.gov.au](https://www.fish.wa.gov.au/Documents/recreational_fishing/fact_sheets/fact_sheet_barramundi.pdf#:~:text=continuous%20water%20flow,submerged%20logs%20and%20overhanging%20vegetation)",
+        "barometric": "steady/rising",
+        "turbidity": "low to moderate",
+        "moon_phase": "full/new (spawning) [oai_citation:28‡fish.wa.gov.au](https://www.fish.wa.gov.au/Documents/recreational_fishing/fact_sheets/fact_sheet_barramundi.pdf#:~:text=season,periods%20of%20greatest%20spawning%20activity)"
+      },
+      "monthly_seasonality": {"peak_month": 12, "spread_months": 4},
+      "temperature_preference": {"optimal": 25, "tolerance": [18, 34]},
+      "pressure_tolerance_hPa": 5,
+      "prey": ["small fish", "prawns", "crabs"],
+      "bait": {
+        "natural": ["live prawns", "mullet strips", "large mullet minnows"],
+        "artificial": ["popper lures", "stickbaits", "hard-body minnow lures"]
+      },
+      "lure_color": {
+        "clear": "natural (silver/white)", 
+        "stained": "yellow/chartreuse", 
+        "muddy": "orange/chartreuse"
+      },
+      "lure_vibration": "medium (loud for murky) [oai_citation:29‡designworksaustralia.com](https://www.designworksaustralia.com/blogs/blog/the-ultimate-guide-finding-the-best-lure-for-barramundi#:~:text=2.%20,easier%20for%20barramundi%20to%20detect)",
+      "retrieve_style": ["fast surface plug (morning)", "slow roll (noon)"],
+      "water_column": "mid-water (near structure)",
+      "rig_types": ["heavy rod/spinner"], 
+      "substrate_sensitivity": "structure (logs, snags, undercuts)"
+    },
+    {
+      "common_name": "Mangrove Jack",
+      "scientific_name": "Lutjanus argentimaculatus",
+      "preferred_habitat": ["mangrove estuaries", "reef edges", "brackish creeks"],
+      "feeding_triggers": {
+        "temperature": "warm (>22\u00b0C) [oai_citation:30‡fishbase.se](https://www.fishbase.se/summary/lutjanus-argentimaculatus.html#:~:text=Environment%3A%20milieu%20%2F%20climate%20zone,range%20%2F%20distribution%20range%20Ecology)",
+        "barometric": "high/stable [oai_citation:31‡tackleworld.com.au](https://tackleworld.com.au/blogs/news/secrets-to-catch-mangrove-jack#:~:text=Australia%2C%20but%20the%20best%20time,versions%20aggressively%20hit%20live%20baits)",
+        "turbidity": "moderate",
+        "moon_phase": "none specific"
+      },
+      "monthly_seasonality": {"peak_month": 1, "spread_months": 3},
+      "temperature_preference": {"optimal": 26, "tolerance": [16, 30]},
+      "pressure_tolerance_hPa": 5,
+      "prey": ["baitfish", "prawns", "crabs"],
+      "bait": {
+        "natural": ["bluebaits", "live prawns"],
+        "artificial": ["soft plastic shads", "vibrating lures", "spinnerbaits"]
+      },
+      "lure_color": {
+        "clear": "bright green/white",
+        "stained": "pink/yellow",
+        "muddy": "orange/chartreuse"
+      },
+      "lure_vibration": "loud (thump-style lures) [oai_citation:32‡designworksaustralia.com](https://www.designworksaustralia.com/blogs/blog/the-ultimate-guide-finding-the-best-lure-for-barramundi#:~:text=2.%20,easier%20for%20barramundi%20to%20detect)",
+      "retrieve_style": ["slow roll (structure)", "steady jigging"],
+      "water_column": "bottom/structure-oriented",
+      "rig_types": ["parasite jig", "zman jig-head"], 
+      "substrate_sensitivity": "rocky/mangrove (snaggy)"
+    },
+    {
+      "common_name": "Giant Trevally",
+      "scientific_name": "Caranx ignobilis",
+      "preferred_habitat": ["reef flats", "tidal channels", "estuaries"],
+      "feeding_triggers": {
+        "temperature": "warm (>24\u00b0C) [oai_citation:33‡fishbase.se](https://www.fishbase.se/summary/caranx-ignobilis#:~:text=Marine%3B%20brackish%3B%20reef,129%C2%B0W)",
+        "barometric": "steady",
+        "turbidity": "clear to moderate",
+        "moon_phase": "none specific"
+      },
+      "monthly_seasonality": {"peak_month": 12, "spread_months": 4},
+      "temperature_preference": {"optimal": 27, "tolerance": [24, 30]},
+      "pressure_tolerance_hPa": 5,
+      "prey": ["other fish", "crustaceans", "cephalopods"],
+      "bait": {
+        "natural": ["tuna strips", "madam prawns"],
+        "artificial": ["topwater poppers", "metal jigs", "stickbaits"]
+      },
+      "lure_color": {
+        "clear": "silver/blue",
+        "stained": "green/chartreuse",
+        "muddy": "bright orange"
+      },
+      "lure_vibration": "medium (use loud in muddy water)",
+      "retrieve_style": ["fast darting (dawn)", "jigging (noon)"],
+      "water_column": "throughout (mid-water to bottom) [oai_citation:34‡en.wikipedia.org](https://en.wikipedia.org/wiki/Giant_trevally#:~:text=The%20giant%20trevally%20inhabits%20a,tend%20to%20move%20to%20deeper)",
+      "rig_types": ["heavy jig", "fast-troll lure"], 
+      "substrate_sensitivity": "open reefs, avoids heavy snags"
+    },
+    {
+      "common_name": "Indo-Pacific Tarpon",
+      "scientific_name": "Megalops cyprinoides",
+      "preferred_habitat": ["estuaries", "lower rivers", "coastal bays"],
+      "feeding_triggers": {
+        "temperature": "warm tropical",
+        "barometric": "steady",
+        "turbidity": "low to moderate",
+        "moon_phase": "none specific"
+      },
+      "monthly_seasonality": {"peak_month": 6, "spread_months": 5},
+      "temperature_preference": {"optimal": 28, "tolerance": [20, 32]},
+      "pressure_tolerance_hPa": 5,
+      "prey": ["small fish", "shrimp", "crustaceans"],
+      "bait": {
+        "natural": ["live mullet", "shrimp bait"],
+        "artificial": ["soft plastic baits", "large plugs"]
+      },
+      "lure_color": {
+        "clear": "silver/white",
+        "stained": "chartreuse",
+        "muddy": "bright orange"
+      },
+      "lure_vibration": "medium (vibes or quiet plugs)",
+      "retrieve_style": ["slow trolling", "letbait sit (strike)"],
+      "water_column": "surface to mid-water [oai_citation:35‡fishbase.mnhn.fr](https://fishbase.mnhn.fr/summary/Megalops-cyprinoides#:~:text=Marine%3B%20freshwater%3B%20brackish%3B%20benthopelagic%3B%20amphidromous%3B,130%C2%B0W)",
+      "rig_types": ["live bait rig", "circle hook"], 
+      "substrate_sensitivity": "soft bottom, avoids rocky bottoms"
+    },
+    {
+      "common_name": "Fourfinger Threadfin",
+      "scientific_name": "Eleutheronema tetradactylum",
+      "preferred_habitat": ["muddy flats", "estuary banks"],
+      "feeding_triggers": {
+        "temperature": "warm tropical",
+        "barometric": "steady",
+        "turbidity": "murky (high tolerance)",
+        "moon_phase": "none specific"
+      },
+      "monthly_seasonality": {"peak_month": 2, "spread_months": 3},
+      "temperature_preference": {"optimal": 27, "tolerance": [22, 30]},
+      "pressure_tolerance_hPa": 5,
+      "prey": ["grey mullet", "anchovies", "prawns"],
+      "bait": {
+        "natural": ["live anchovy", "fresh shrimp"],
+        "artificial": ["jig heads", "soft plastic shrimp imitations"]
+      },
+      "lure_color": {
+        "clear": "brown/olive",
+        "stained": "red/orange",
+        "muddy": "bright chartreuse"
+      },
+      "lure_vibration": "low to medium",
+      "retrieve_style": ["slow sinking jig", "steady twitch"],
+      "water_column": "bottom/mid-water",
+      "rig_types": ["jig head rig", "carolina rig"], 
+      "substrate_sensitivity": "mud/sand (spiney fins caution)"
+    },
+    {
+      "common_name": "Narrow-barred Spanish Mackerel",
+      "scientific_name": "Scomberomorus commerson",
+      "preferred_habitat": ["coastal pelagic", "sandy slopes"],
+      "feeding_triggers": {
+        "temperature": "warm tropical",
+        "barometric": "steady",
+        "turbidity": "clear",
+        "moon_phase": "none specific"
+      },
+      "monthly_seasonality": {"peak_month": 7, "spread_months": 3},
+      "temperature_preference": {"optimal": 26, "tolerance": [24, 30]},
+      "pressure_tolerance_hPa": 5,
+      "prey": ["anchovies", "clupeids", "squid"],
+      "bait": {
+        "natural": ["pilchards", "squid strips"],
+        "artificial": ["metal spoons", "fast plugs"]
+      },
+      "lure_color": {
+        "clear": "silver",
+        "stained": "yellow",
+        "muddy": "chartreuse"
+      },
+      "lure_vibration": "medium",
+      "retrieve_style": ["fast jerking", "popping"],
+      "water_column": "surface/mid-water [oai_citation:36‡fishbase.se](https://www.fishbase.se/summary/scomberomorus-commerson.html#:~:text=Marine%3B%20pelagic,170%C2%B0W%20%28Ref.%2054880)",
+      "rig_types": ["fast-trolling jigs", "popper"], 
+      "substrate_sensitivity": "open water (not structure-oriented)"
+    },
+    {
+      "common_name": "Indian Scad",
+      "scientific_name": "Decapterus russelli",
+      "preferred_habitat": ["offshore coastal waters", "open banks"],
+      "feeding_triggers": {
+        "temperature": "warm tropical",
+        "barometric": "steady",
+        "turbidity": "clear",
+        "moon_phase": "none"
+      },
+      "monthly_seasonality": {"peak_month": 6, "spread_months": 4},
+      "temperature_preference": {"optimal": 25, "tolerance": [20, 30]},
+      "pressure_tolerance_hPa": 5,
+      "prey": ["planktonic copepods", "larval crustaceans"],
+      "bait": {
+        "natural": ["small shrimps", "zooplankton"],
+        "artificial": ["sabiki rigs", "small jigs"]
+      },
+      "lure_color": {
+        "clear": "silver",
+        "stained": "chartreuse",
+        "muddy": "bright green"
+      },
+      "lure_vibration": "low",
+      "retrieve_style": ["steady jigging"],
+      "water_column": "mid-water (benthopelagic)",
+      "rig_types": ["sabiki rig", "micro jig"], 
+      "substrate_sensitivity": "open water (no bottom focus)"
+    },
+    {
+      "common_name": "Indian Oil Sardine",
+      "scientific_name": "Sardinella longiceps",
+      "preferred_habitat": ["coastal pelagic", "surface"],
+      "feeding_triggers": {
+        "temperature": "warm",
+        "barometric": "steady",
+        "turbidity": "clear",
+        "moon_phase": "none"
+      },
+      "monthly_seasonality": {"peak_month": 7, "spread_months": 2},
+      "temperature_preference": {"optimal": 24, "tolerance": [20, 30]},
+      "pressure_tolerance_hPa": 5,
+      "prey": ["phytoplankton", "zooplankton"],
+      "bait": {
+        "natural": ["phytoplankton", "copepods"],
+        "artificial": ["fine nets (cast nets)", "sabiki hook rigs"]
+      },
+      "lure_color": {
+        "clear": "silver",
+        "stained": "silver",
+        "muddy": "silver"
+      },
+      "lure_vibration": "silent (no lures used)",
+      "retrieve_style": ["fine slow retrieve"],
+      "water_column": "surface",
+      "rig_types": ["sabiki rig", "cast net"], 
+      "substrate_sensitivity": "open water (schools)"
+    },
+    {
+      "common_name": "Grey Mullet",
+      "scientific_name": "Mugil cephalus",
+      "preferred_habitat": ["brackish bays", "estuary mouths"],
+      "feeding_triggers": {
+        "temperature": "8-24\u00b0C range",
+        "barometric": "steady",
+        "turbidity": "any (muddy tolerant)",
+        "moon_phase": "none"
+      },
+      "monthly_seasonality": {"peak_month": 6, "spread_months": 5},
+      "temperature_preference": {"optimal": 18, "tolerance": [8, 24]},
+      "pressure_tolerance_hPa": 5,
+      "prey": ["algae", "detritus", "microcrustaceans"],
+      "bait": {
+        "natural": ["bread", "fishmeal pellets"],
+        "artificial": ["bread ball rigs", "groundbait rigs"]
+      },
+      "lure_color": {
+        "clear": "dull brown/olive",
+        "stained": "green",
+        "muddy": "brown"
+      },
+      "lure_vibration": "silent (stationary baits)",
+      "retrieve_style": ["deadstick (no retrieve)"],
+      "water_column": "surface",
+      "rig_types": ["carolina rig with bread", "groundbait feeder"], 
+      "substrate_sensitivity": "sandy/muddy bottoms"
+    }
+  ]
+}
