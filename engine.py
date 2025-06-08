@@ -3,20 +3,26 @@ import math
 import json
 import os
 
-from cmems_sst import fetch_sst  # from your previously committed file
+from cmems_sst import fetch_sst
 
 # Load species temperature preferences
 with open("species.json", "r") as f:
     species_data = json.load(f)
 
-# Heuristic signal normalization functions
+# --------------------------
+# Utility Functions
+# --------------------------
+
 def sigmoid(x):
     return 1 / (1 + math.exp(-x))
 
 def clamp(val, min_val=0.0, max_val=1.0):
     return max(min(val, max_val), min_val)
 
-# Compute individual scores (each must return between 0 and 1)
+# --------------------------
+# Scoring Components
+# --------------------------
+
 def tide_score(hours_from_high):
     return sigmoid(-abs(hours_from_high) / 1.5)
 
@@ -51,9 +57,9 @@ def sst_score(current_sst, species_name):
         sigma = species.get("tolerance_sigma", 2)
         return math.exp(-((current_sst - T_opt) ** 2) / (2 * sigma ** 2))
     except KeyError:
-        return 0.5  # fallback if species not found
+        return 0.5
 
-def seasonal_index(day_of_year, peak_day=288):  # Oct 15 ~ DOY 288
+def seasonal_index(day_of_year, peak_day=288):
     return 0.5 + 0.5 * math.sin(2 * math.pi * (day_of_year - peak_day) / 365)
 
 def method_bias(method, is_daytime):
@@ -61,7 +67,10 @@ def method_bias(method, is_daytime):
         return 0.1
     return 0.0
 
-# Main scoring function
+# --------------------------
+# Master Prediction Function
+# --------------------------
+
 def compute_fish_score(
     species_name,
     lat,
@@ -81,10 +90,9 @@ def compute_fish_score(
     method,
     is_day
 ):
-    # Fetch SST
     sst = fetch_sst(lat, lon, date)
     if sst is None:
-        sst = 27  # fallback
+        sst = 27.0
 
     score = (
         0.25 * tide_score(hrs_from_high) +
@@ -94,7 +102,7 @@ def compute_fish_score(
         0.10 * pressure_trend_score(pressure_now, pressure_6h_ago) +
         0.07 * wind_boost_score(wind_speed, is_onshore) +
         0.05 * sst_score(sst, species_name) +
-        0.03 * 1.0 +  # placeholder turbidity score
+        0.03 * 1.0 +  # Turbidity placeholder
         0.07 * seasonal_index(date.timetuple().tm_yday) +
         0.03 * method_bias(method, is_day)
     )
@@ -109,3 +117,28 @@ def compute_fish_score(
         label = "Poor"
 
     return round(score, 3), label, round(sst, 2)
+
+# --------------------------
+# Simple wrapper for current use
+# --------------------------
+
+def calc_fai(state):
+    return compute_fish_score(
+        species_name="snapper",
+        lat=state["lat"],
+        lon=state["lon"],
+        date=datetime.date.today(),
+        hrs_from_high=0.5,
+        daily_tide_range=1.3,
+        max_range_30d=2.4,
+        solunar_type="major",
+        mins_to_solunar=20,
+        solar_alt=8,
+        cloud_frac=state["weather"].get("clouds", 20) / 100,
+        pressure_now=state["weather"].get("pressure", 1012),
+        pressure_6h_ago=state["weather"].get("pressure", 1010),
+        wind_speed=state["weather"].get("wind_speed", 2),
+        is_onshore=True,
+        method="lure",
+        is_day=True
+    )
