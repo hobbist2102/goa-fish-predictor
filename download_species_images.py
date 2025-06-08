@@ -1,49 +1,51 @@
 import os
 import json
 import requests
-from pathlib import Path
-from urllib.parse import quote
 
-# Make sure assets folder exists
-Path("assets").mkdir(parents=True, exist_ok=True)
+# 🔐 Hardcoded Unsplash API Key — REPLACE THIS with your actual key
+UNSPLASH_KEY = "6tJFR4XgJctp3HRPEmokXjfcNHZk6n3LlaCjdnSu7_4"
 
-# Load species list
+ASSETS_DIR = "assets"
+SEARCH_URL = "https://api.unsplash.com/search/photos"
+
+if not os.path.exists(ASSETS_DIR):
+    os.makedirs(ASSETS_DIR)
+
 with open("species.json", "r") as f:
-    species_list = json.load(f)["species"]
+    species_data = json.load(f)["species"]
 
-# DuckDuckGo Image Search API (Unofficial, fast)
-def fetch_duckduckgo_image(query):
-    url = f"https://duckduckgo.com/i.js?q={quote(query)}&o=json"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        if "results" in data and len(data["results"]) > 0:
-            return data["results"][0]["image"]
-    except Exception as e:
-        print(f"Error fetching image for {query}: {e}")
-    return None
+headers = {
+    "Accept-Version": "v1",
+    "Authorization": f"Client-ID {UNSPLASH_KEY}"
+}
 
-# Main loop
-for sp in species_list:
-    name = sp["common_name"]
-    safe_name = name.lower().replace(" ", "_")
-    filepath = f"assets/{safe_name}.jpg"
+for fish in species_data:
+    name = fish["common_name"]
+    filename = os.path.join(ASSETS_DIR, f"{name.lower().replace(' ', '_')}.jpg")
 
-    if os.path.exists(filepath):
-        print(f"✔️ {safe_name}.jpg already exists.")
+    if os.path.exists(filename):
+        print(f"✅ Already exists: {filename}")
         continue
 
     print(f"🔍 Searching image for: {name}")
-    img_url = fetch_duckduckgo_image(name + " fish")
-    if img_url:
-        try:
-            img_data = requests.get(img_url).content
-            with open(filepath, "wb") as f:
-                f.write(img_data)
-            print(f"✅ Downloaded: {filepath}")
-        except Exception as e:
-            print(f"❌ Failed to save {name}: {e}")
-    else:
-        print(f"❌ No image found for: {name}")
+    params = {"query": f"{name} fish", "per_page": 1}
+
+    try:
+        response = requests.get(SEARCH_URL, headers=headers, params=params)
+        response.raise_for_status()
+        results = response.json()["results"]
+
+        if not results:
+            print(f"❌ No image found for: {name}")
+            continue
+
+        image_url = results[0]["urls"]["small"]
+        image = requests.get(image_url).content
+
+        with open(filename, "wb") as f:
+            f.write(image)
+
+        print(f"✅ Downloaded: {filename}")
+
+    except Exception as e:
+        print(f"❌ Failed for {name}: {e}")
