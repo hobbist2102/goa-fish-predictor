@@ -10,27 +10,9 @@ st.markdown(
     "This **physics‑first** prototype rates feeding windows \n"
     "for inshore game fish near *15.5 °N, 73.8 °E* with **no catch logs**.")
 
-# -- Placeholder inputs -------------------------------------------------
-
-now = datetime.utcnow()
-
-# In a real app these will come from APIs; for demo we randomise
-state = State(
-    T= random.uniform(27.0, 29.8),
-    dT_dt= random.uniform(-0.3, 0.3),
-    dh_dt= random.uniform(-1.5, 1.5),
-    pci= random.uniform(0, 1),
-    mtw= random.uniform(-180, 180),
-    dP_3h= random.uniform(-3, 3),
-    wspd= random.uniform(0, 10),
-    onshore= random.choice([True, False]),
-    chl= random.uniform(0.1, 1.0),
-    salinity_class=1,
-)
-
-fai = calc_fai(state)
-
-# -- Display ------------------------------------------------------------
+from data_fetcher import get_state_now
+...
+state = get_state_now()   # ← live data instead of random numbers
 
 st.metric("Fish Activity Index", f"{fai:.2f}")
 
