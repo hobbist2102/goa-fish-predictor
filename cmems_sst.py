@@ -1,30 +1,48 @@
+import os
 import datetime
-from datetime import timedelta
-import logging
-from copernicusmarine import open_dataset
+import xarray as xr
+from copernicusmarine import subset
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+# Credentials come from ~/.netrc written in GitHub Actions
+# Dataset details
+DATASET_ID = "SST_GLO_SST_L4_REP_OBSERVATIONS_010_011"
+VARIABLES = ["analysed_sst"]
+LAT = 15.5
+LON = 73.8
+DELTA = 0.05
+DATE = datetime.datetime.utcnow() - datetime.timedelta(days=2)
 
-# Use timezone-aware UTC datetime (avoid deprecation)
-date = datetime.datetime.now(datetime.timezone.utc) - timedelta(days=2)
-date_str = date.strftime('%Y-%m-%d')
+# Bounding box
+BBOX = {
+    "north": LAT + DELTA,
+    "south": LAT - DELTA,
+    "east": LON + DELTA,
+    "west": LON - DELTA,
+}
+OUTPUT_FILENAME = f"sst_{LAT}_{LON}_{DATE.strftime('%Y%m%d')}.nc"
 
-logging.info("Fetching SST from CMEMS...")
+print("Fetching SST from CMEMS...")
 
 try:
-    ds = open_dataset(
-        dataset_id="SST_GLO_SST_L4_REP_OBSERVATIONS_010_011",
-        minimum_longitude=72.5,
-        maximum_longitude=74.5,
-        minimum_latitude=14.5,
-        maximum_latitude=16.5,
-        start_datetime=date_str,
-        end_datetime=date_str,
+    subset(
+        dataset_id=DATASET_ID,
+        variables=VARIABLES,
+        bounding_box={
+            "north": BBOX["north"],
+            "south": BBOX["south"],
+            "east": BBOX["east"],
+            "west": BBOX["west"],
+        },
+        date=DATE,
+        output_filename=OUTPUT_FILENAME,
+        overwrite=True,
     )
-    output_filename = f"sst_{date_str}.nc"
-    ds.to_netcdf(output_filename)
-    logging.info(f"✅ SST data saved to {output_filename}")
+
+    ds = xr.open_dataset(OUTPUT_FILENAME)
+    value = float(ds[VARIABLES[0]].isel(time=0).mean().values)
+    print(f"SST for {DATE.date()}: {value:.2f} °C")
+    ds.close()
+
 except Exception as e:
-    logging.error(f"❌ CMEMS SST fetch error: {e}")
-    logging.info("SST: None")
+    print(f"❌ CMEMS SST fetch error: {e}")
+    print("SST: None")
