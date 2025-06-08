@@ -3,44 +3,38 @@ from datetime import datetime, timedelta, timezone
 from copernicusmarine import subset
 import xarray as xr
 
-# Set your CMEMS credentials from environment variables
 USERNAME = os.getenv("CMEMS_USER")
 PASSWORD = os.getenv("CMEMS_PASS")
 
-# Configuration for the dataset
-DATASET_ID = "cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m"
-VARIABLES = ["sohtc"]  # Use a list for 'variables'
-OUTPUT_DIR = "."
+DATASET_ID = "SST_GLO_SST_L4_NRT_OBSERVATIONS_010_001"  # OSTIA global SST
+VARIABLES = ["analysed_sst"]
 LON_MIN, LON_MAX = 73.5, 75.5
 LAT_MIN, LAT_MAX = 14.5, 16.5
 
-# Use a timezone-aware date and subtract lag
-date = datetime.now(timezone.utc) - timedelta(days=2)  # CMEMS data is typically available with 1–2 day lag
-DATE = date.strftime("%Y-%m-%d")
+date = datetime.now(timezone.utc) - timedelta(days=1)
+DATE_STR = date.strftime("%Y-%m-%d")
+OUT_FILE = f"sst_{DATE_STR}.nc"
 
 print("Fetching SST from CMEMS...")
 
 try:
-    subset_result = subset(
+    subset(
         username=USERNAME,
         password=PASSWORD,
         dataset_id=DATASET_ID,
-        variables=VARIABLES,  # ✅ FIXED HERE
+        variables=VARIABLES,
         minimum_longitude=LON_MIN,
         maximum_longitude=LON_MAX,
         minimum_latitude=LAT_MIN,
         maximum_latitude=LAT_MAX,
-        start_datetime=DATE,
-        end_datetime=DATE,
-        output_filename=f"{OUTPUT_DIR}/sst_{DATE}.nc",
+        start_datetime=DATE_STR,
+        end_datetime=DATE_STR,
+        output_filename=OUT_FILE,
+        overwrite=True,
     )
-
-    print(f"✅ SST data downloaded: sst_{DATE}.nc")
-
-    # Optional: validate using xarray
-    ds = xr.open_dataset(f"{OUTPUT_DIR}/sst_{DATE}.nc")
+    ds = xr.open_dataset(OUT_FILE)
     print(ds)
-
+    ds.close()
+    print(f"✅ SST file saved: {OUT_FILE}")
 except Exception as e:
-    print(f"⚠️ CMEMS SST fetch error: {e}")
-    print("SST: None")
+    print(f"❌ CMEMS error: {e}")
