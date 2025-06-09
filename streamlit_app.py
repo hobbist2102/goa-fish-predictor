@@ -76,6 +76,6 @@ else:
 # ----------------------------------------------------------------------
 
 st.caption(
-    "_Live data from OpenWeatherMap, CMEMS (SST), and WorldTides (Mormugao tide station)._\n"
+    "_Live data from OpenWeatherMap, CMEMS (SST), and Stormglass (tides, currents, bio)._  \n"
     "_Built with love by coastal fishing nerds 🐠_"
 )
