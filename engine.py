@@ -1,24 +1,30 @@
-import json
-import math
 import datetime
+import math
+import json
+import os
 
-# Load species data from local JSON file
+from cmems_sst import fetch_sst
+
+# Load species temperature preferences
 with open("species.json", "r") as f:
-    species_json = json.load(f)
-    species_data = {
-        s["common_name"].lower(): s for s in species_json.get("species", [])
-    }
+    species_data = json.load(f)
 
+# ------------------------------------------
 # Utility functions
-def sigmoid(x):
-    return 1 / (1 + math.exp(-x))
+# ------------------------------------------
 
 def clamp(val, min_val=0.0, max_val=1.0):
     return max(min(val, max_val), min_val)
 
-# Scoring functions
-def tide_score(hours_from_high):
-    return sigmoid(-abs(hours_from_high) / 1.5)
+def sigmoid(x):
+    return 1 / (1 + math.exp(-x))
+
+# ------------------------------------------
+# Individual scoring functions
+# ------------------------------------------
+
+def tide_score(hrs_from_high):
+    return sigmoid(-abs(hrs_from_high) / 1.5)
 
 def solunar_score(period_type, mins_to_next):
     if period_type == "major":
@@ -28,9 +34,9 @@ def solunar_score(period_type, mins_to_next):
     else:
         return math.exp(-mins_to_next / 90)
 
-def light_score(solar_altitude_deg, cloud_fraction):
-    base = clamp(1 - abs(solar_altitude_deg) / 10, 0.3, 1)
-    return base + 0.4 * cloud_fraction
+def light_score(solar_altitude, cloud_cover):
+    base = clamp(1 - abs(solar_altitude) / 10, 0.3, 1.0)
+    return clamp(base + 0.4 * cloud_cover)
 
 def pressure_trend_score(p_now, p_6h_ago):
     delta = p_now - p_6h_ago
@@ -45,13 +51,13 @@ def wind_boost_score(speed_mps, is_onshore):
         return 0.3
 
 def sst_score(current_sst, species_name):
-    species = species_data.get(species_name.lower())
-    if not species:
+    try:
+        species = species_data[species_name]
+        T_opt = species["preferred_temperature"]
+        sigma = species.get("tolerance_sigma", 2)
+        return math.exp(-((current_sst - T_opt) ** 2) / (2 * sigma ** 2))
+    except KeyError:
         return 0.5
-    T_opt = species.get("temperature_preference", {}).get("optimal", 27)
-    tolerance = species.get("temperature_preference", {}).get("tolerance", [24, 30])
-    sigma = (tolerance[1] - tolerance[0]) / 4 if len(tolerance) == 2 else 2
-    return math.exp(-((current_sst - T_opt) ** 2) / (2 * sigma ** 2))
 
 def seasonal_index(day_of_year, peak_day=288):
     return 0.5 + 0.5 * math.sin(2 * math.pi * (day_of_year - peak_day) / 365)
@@ -61,47 +67,77 @@ def method_bias(method, is_daytime):
         return 0.1
     return 0.0
 
-# Main scoring engine
-def compute_fish_score(
-    species_name,
-    lat,
-    lon,
-    date: datetime.date,
-    hrs_from_high,
-    daily_tide_range,
-    max_range_30d,
-    solunar_type,
-    mins_to_solunar,
-    solar_alt,
-    cloud_frac,
-    pressure_now,
-    pressure_6h_ago,
-    wind_speed,
-    is_onshore,
-    method,
-    is_day,
-    sst
-):
-    score = (
-        0.25 * tide_score(hrs_from_high) +
-        0.10 * (daily_tide_range / max_range_30d) +
-        0.20 * solunar_score(solunar_type, mins_to_solunar) +
-        0.10 * light_score(solar_alt, cloud_frac) +
-        0.10 * pressure_trend_score(pressure_now, pressure_6h_ago) +
-        0.07 * wind_boost_score(wind_speed, is_onshore) +
-        0.05 * sst_score(sst, species_name) +
-        0.03 * 1.0 +  # Placeholder for turbidity
-        0.07 * seasonal_index(date.timetuple().tm_yday) +
-        0.03 * method_bias(method, is_day)
-    )
-
-    if score >= 0.80:
-        label = "Excellent"
-    elif score >= 0.65:
-        label = "Good"
-    elif score >= 0.50:
-        label = "Fair"
+def chlorophyll_score(chl):
+    if chl < 0.1:
+        return 0.2
+    elif chl < 0.5:
+        return 0.6
+    elif chl < 1.5:
+        return 0.9
     else:
-        label = "Poor"
+        return 0.7
 
-    return round(score, 3), label, round(sst, 2)
+def oxygen_score(oxygen):
+    if oxygen >= 6:
+        return 1.0
+    elif oxygen >= 4:
+        return 0.8
+    elif oxygen >= 2:
+        return 0.5
+    else:
+        return 0.2
+
+def salinity_score(salinity):
+    return clamp(1 - abs(salinity - 35) / 5)
+
+def swell_effect_score(direction, height):
+    if height > 2:
+        return 0.3
+    elif height > 1:
+        return 0.6
+    else:
+        return 0.9
+
+def current_speed_score(speed):
+    return clamp(math.exp(-abs(speed - 0.5)))
+
+def depth_penalty(depth):
+    return 1.0 if depth < 50 else 0.7
+
+# ------------------------------------------
+# Main prediction interface
+# ------------------------------------------
+
+def predict_best_catch(state):
+    lat = state["lat"]
+    lon = state["lon"]
+    date = datetime.datetime.fromisoformat(state["datetime"]).date()
+
+    results = []
+
+    for species in species_data:
+        score = (
+            0.15 * tide_score(state["tide_hours_from_high"]) +
+            0.10 * solunar_score(state["solunar_type"], state["solunar_mins_to_next"]) +
+            0.10 * light_score(state["solar_altitude"], state["weather"]["clouds"] / 100) +
+            0.10 * pressure_trend_score(state["weather"]["pressure"], state["pressure_6h_ago"]) +
+            0.07 * wind_boost_score(state["weather"]["wind_speed"], state.get("is_onshore", True)) +
+            0.08 * sst_score(state["sst"], species) +
+            0.07 * seasonal_index(date.timetuple().tm_yday) +
+            0.05 * chlorophyll_score(state.get("chlorophyll", 0.3)) +
+            0.05 * oxygen_score(state.get("oxygen", 5.0)) +
+            0.04 * salinity_score(state.get("salinity", 35.0)) +
+            0.04 * swell_effect_score(state.get("swell_direction", 180), state.get("swell_height", 1.0)) +
+            0.03 * current_speed_score(state.get("current_speed", 0.5)) +
+            0.02 * depth_penalty(state.get("depth", 20.0))
+        )
+
+        results.append((species, round(score, 3)))
+
+    best = sorted(results, key=lambda x: x[1], reverse=True)[0]
+    return {
+        "species": best[0],
+        "score": best[1],
+        "recommendation": "Use bait" if best[1] < 0.6 else "Try lure",
+        "all_scores": results
+    }
